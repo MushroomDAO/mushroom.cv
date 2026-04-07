@@ -42,6 +42,10 @@ contract DeploySaleContract is Script {
             console.log("Accepted USDT:   ", usdtSepolia);
         }
 
+        // Disable whitelist — open sale
+        saleContract.setWhitelistRequired(false);
+        console.log("Whitelist:       disabled (open sale)");
+
         vm.stopBroadcast();
 
         console.log("SaleContract deployed at:", address(saleContract));
