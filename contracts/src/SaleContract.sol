@@ -1,103 +1,171 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 /**
  * @title SaleContract
  * @author Mycelium Protocol
- * @notice This contract manages the initial sale of GToken.
- * It uses a multi-stage linear price curve to sell a fixed supply of tokens.
- * Access is controlled by an off-chain whitelist mechanism via EIP-712 signatures.
+ * @notice Revenue-Based Milestone Sale for GToken.
+ *
+ * The sale is divided into 6 milestones (0-5). The price increases at each milestone
+ * and the owner can advance the milestone once totalRevenue reaches the milestone's
+ * revenueCap. This design aligns price increases with actual traction.
+ *
+ * All USD amounts use 6 decimals (USDC/USDT precision).
+ * GToken uses 18 decimals.
  */
-contract SaleContract is Ownable, ReentrancyGuard {
-    using SafeERC20 for ERC20;
+contract SaleContract is Ownable, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
+
+    // =============================================================
+    //                         ERRORS
+    // =============================================================
+
+    error ZeroAmount();
+    error TokenNotAccepted(address token);
+    error ExceedsPerPersonCap(uint256 requested, uint256 remaining);
+    error InsufficientInventory(uint256 requested, uint256 available);
+    error NotWhitelisted(address user);
+    error MilestoneNotReached(uint256 currentRevenue, uint256 required);
+    error AlreadyAtMaxMilestone();
+    error ZeroAddress();
+
+    // =============================================================
+    //                         MILESTONE DATA
+    // =============================================================
+
+    struct Milestone {
+        uint256 priceUSD;      // Price of 1 GToken in USD (6 decimals)
+        uint256 revenueCap;    // Cumulative USD revenue required to reach this milestone (6 decimals)
+    }
+
+    /// @dev Milestone 0 is the initial state (revenueCap = 0 means always reachable at start)
+    Milestone[6] private _milestones;
 
     // =============================================================
     //                           STATE
     // =============================================================
 
-    ERC20 public immutable gToken;
+    /// @notice The GToken being sold
+    IERC20 public immutable gToken;
+
+    /// @notice Address that receives payment proceeds
     address public treasury;
 
-    uint256 public tokensSold;
-    uint256 public immutable totalTokensForSale;
+    /// @notice Current milestone index (0-5)
+    uint256 public currentMilestone;
 
-    // Mapping to prevent a user from buying more than once
-    mapping(address => bool) public hasBought;
+    /// @notice Cumulative USD revenue received (6 decimals)
+    uint256 public totalRevenue;
 
-    // Off-chain signature verifier address
-    address public whitelistVerifier;
+    /// @notice Cumulative GTokens sold (18 decimals)
+    uint256 public totalTokensSold;
 
-    // --- Slope-Driven Price Curve Parameters ---
-    uint256 public constant PRECISION = 1e36;
-    uint256 public constant INITIAL_PRICE_USD = 1_000_000; // $1.00
+    /// @notice Per-user cumulative USD spent (6 decimals)
+    mapping(address => uint256) public userTotalSpent;
 
-    // Price increase amounts in USD (6 decimals) per 10,000 GTokens (1e18 decimals)
-    uint256 public constant STAGE1_PRICE_INCREASE_PER_10K = 25_000;   // $0.025 per 10k tokens
-    uint256 public constant STAGE2_PRICE_INCREASE_PER_10K = 50_000;   // $0.05 per 10k tokens
-    uint256 public constant STAGE3_PRICE_INCREASE_PER_10K = 30_000;   // $0.03 per 10k tokens
+    /// @notice Per-person purchase cap in USD (6 decimals), default $864
+    uint256 public perPersonCapUSD = 864_000_000;
 
-    // These thresholds define the token sale stages.
-    uint256 public constant STAGE1_TOKEN_LIMIT = 210_000 * 1e18;
-    uint256 public constant STAGE2_TOKEN_LIMIT = 630_000 * 1e18; // 210k + 420k
-    uint256 public constant TOTAL_TOKEN_LIMIT = 1_050_000 * 1e18; // Stage 1 + 2 + 3
+    /// @notice Whether whitelist gating is active
+    bool public whitelistRequired;
 
-    // Calculate base prices directly without divide-before-multiply pattern
-    // Formula: base_price = initial_price + (token_limit / 10_000) * price_increase_per_10k
-    uint256 public constant STAGE2_BASE_PRICE_USD = INITIAL_PRICE_USD + (STAGE1_TOKEN_LIMIT / 10_000 / 1e18) * STAGE1_PRICE_INCREASE_PER_10K;
-    uint256 public constant STAGE3_BASE_PRICE_USD = STAGE2_BASE_PRICE_USD + ((STAGE2_TOKEN_LIMIT - STAGE1_TOKEN_LIMIT) / 10_000 / 1e18) * STAGE2_PRICE_INCREASE_PER_10K;
-    uint256 public constant CEILING_PRICE_USD = STAGE3_BASE_PRICE_USD + ((TOTAL_TOKEN_LIMIT - STAGE2_TOKEN_LIMIT) / 10_000 / 1e18) * STAGE3_PRICE_INCREASE_PER_10K;
+    /// @notice Whitelisted buyers
+    mapping(address => bool) public isWhitelisted;
+
+    /// @notice Accepted payment tokens (USDC, USDT, etc.)
+    mapping(address => bool) public acceptedTokens;
 
     // =============================================================
     //                          EVENTS
     // =============================================================
 
-    event TokensPurchased(address indexed buyer, uint256 gTokenAmount, uint256 usdValue);
-    event WhitelistVerifierUpdated(address indexed newVerifier);
+    event TokensPurchased(
+        address indexed buyer,
+        address indexed paymentToken,
+        uint256 usdAmount,
+        uint256 gTokenAmount,
+        uint256 priceUSD,
+        uint256 milestone
+    );
+    event MilestoneAdvanced(uint256 indexed newMilestone, uint256 newPriceUSD);
+    event PaymentTokenSet(address indexed token, bool accepted);
     event TreasuryUpdated(address indexed newTreasury);
+    event WhitelistUpdated(address indexed user, bool status);
+    event PerPersonCapUpdated(uint256 newCapUSD);
 
     // =============================================================
-    //                         CONSTRUCTOR
-    // =============================================================
-
-    constructor(address _gTokenAddress, address _initialTreasury, address _initialOwner) Ownable(_initialOwner) {
-        require(_gTokenAddress != address(0), "Zero address");
-        require(_initialTreasury != address(0), "Zero address");
-        gToken = ERC20(_gTokenAddress);
-        treasury = _initialTreasury;
-        totalTokensForSale = TOTAL_TOKEN_LIMIT;
-    }
-
-    // =============================================================
-    //                      PRICE CALCULATION
+    //                        CONSTRUCTOR
     // =============================================================
 
     /**
-     * @notice Calculates the current price of one GToken in USD (with 6 decimals).
+     * @param gTokenAddress Address of the GToken ERC20
+     * @param _treasury Address that receives payment proceeds
+     * @param _initialOwner Owner of this contract
+     */
+    constructor(address gTokenAddress, address _treasury, address _initialOwner) Ownable(_initialOwner) {
+        if (gTokenAddress == address(0)) revert ZeroAddress();
+        if (_treasury == address(0)) revert ZeroAddress();
+
+        gToken = IERC20(gTokenAddress);
+        treasury = _treasury;
+
+        // Initialize milestone data
+        // Milestone 0: initial state — already at start, no revenue needed
+        _milestones[0] = Milestone({priceUSD: 150_000, revenueCap: 0});
+        // Milestone 1: Phase A-1
+        _milestones[1] = Milestone({priceUSD: 168_000, revenueCap: 1_200_000_000});
+        // Milestone 2: Phase A-2
+        _milestones[2] = Milestone({priceUSD: 188_160, revenueCap: 4_800_000_000});
+        // Milestone 3: Phase A-3
+        _milestones[3] = Milestone({priceUSD: 210_739, revenueCap: 12_800_000_000});
+        // Milestone 4: Phase B
+        _milestones[4] = Milestone({priceUSD: 236_028, revenueCap: 49_400_000_000});
+        // Milestone 5: Phase C
+        _milestones[5] = Milestone({priceUSD: 264_351, revenueCap: 135_800_000_000});
+    }
+
+    // =============================================================
+    //                        VIEW FUNCTIONS
+    // =============================================================
+
+    /**
+     * @notice Get the current price of 1 GToken in USD (6 decimals).
      */
     function getCurrentPriceUSD() public view returns (uint256) {
-        uint256 sold = tokensSold;
+        return _milestones[currentMilestone].priceUSD;
+    }
 
-        if (sold >= TOTAL_TOKEN_LIMIT) {
-            return CEILING_PRICE_USD; // Return calculated ceiling price
-        }
+    /**
+     * @notice Calculate how many GTokens (18 decimals) a given USD amount buys
+     *         at the current milestone price.
+     * @param usdAmount Amount in USD (6 decimals)
+     */
+    function getTokensForUSD(uint256 usdAmount) public view returns (uint256) {
+        uint256 price = getCurrentPriceUSD();
+        // gTokenAmount = usdAmount * 1e18 / price
+        return (usdAmount * 1e18) / price;
+    }
 
-        if (sold < STAGE1_TOKEN_LIMIT) {
-            // Calculate price increase: (sold / 10_000 / 1e18) * STAGE1_PRICE_INCREASE_PER_10K
-            return INITIAL_PRICE_USD + (sold / 10_000 / 1e18) * STAGE1_PRICE_INCREASE_PER_10K;
-        } else if (sold < STAGE2_TOKEN_LIMIT) {
-            uint256 soldInStage2 = sold - STAGE1_TOKEN_LIMIT;
-            // Calculate price increase in stage 2
-            return STAGE2_BASE_PRICE_USD + (soldInStage2 / 10_000 / 1e18) * STAGE2_PRICE_INCREASE_PER_10K;
-        } else {
-            uint256 soldInStage3 = sold - STAGE2_TOKEN_LIMIT;
-            // Calculate price increase in stage 3
-            return STAGE3_BASE_PRICE_USD + (soldInStage3 / 10_000 / 1e18) * STAGE3_PRICE_INCREASE_PER_10K;
-        }
+    /**
+     * @notice Get milestone details.
+     * @param index Milestone index (0-5)
+     */
+    function getMilestone(uint256 index) external view returns (uint256 priceUSD, uint256 revenueCap) {
+        Milestone memory m = _milestones[index];
+        return (m.priceUSD, m.revenueCap);
+    }
+
+    /**
+     * @notice How many GTokens are currently available in this contract.
+     */
+    function availableInventory() public view returns (uint256) {
+        return gToken.balanceOf(address(this));
     }
 
     // =============================================================
@@ -105,88 +173,150 @@ contract SaleContract is Ownable, ReentrancyGuard {
     // =============================================================
 
     /**
-     * @notice Main function to purchase GTokens.
-     * @param usdAmount The amount in USD (with 6 decimals) the user wants to spend.
-     * @param paymentToken The address of the ERC20 token to pay with (e.g., USDC, USDT, WBTC).
-     * @param signature The EIP-712 signature for whitelist verification (currently unused).
-     *
-     * TODO: Implement the full logic for the function.
+     * @notice Purchase GTokens by paying with an accepted stablecoin.
+     * @param usdAmount USD amount to spend (6 decimals)
+     * @param paymentToken Accepted ERC20 stablecoin address (e.g. USDC)
      */
-    function buyTokens(uint256 usdAmount, address paymentToken, bytes calldata signature)
-        external
-        payable
-        nonReentrant
-    {
-        // 1. Check if sale is active and has not ended
-        require(tokensSold < totalTokensForSale, "Sale has ended");
+    function buyTokens(uint256 usdAmount, address paymentToken) external nonReentrant whenNotPaused {
+        // 1. Whitelist check
+        if (whitelistRequired && !isWhitelisted[msg.sender]) {
+            revert NotWhitelisted(msg.sender);
+        }
 
-        // 2. Check against multiple buys
-        require(!hasBought[msg.sender], "Address has already bought tokens");
+        // 2. Basic validation
+        if (usdAmount == 0) revert ZeroAmount();
+        if (!acceptedTokens[paymentToken]) revert TokenNotAccepted(paymentToken);
 
-        // 3. Verify the signature from the off-chain service
-        // TODO: Implement EIP-712 signature verification.
-        // The signature should verify the buyer (msg.sender) and the max USD amount they are allowed to spend.
-        // require(verifySignature(msg.sender, usdAmount, signature), "Invalid signature");
+        // 3. Per-person cap check
+        uint256 spent = userTotalSpent[msg.sender];
+        if (spent + usdAmount > perPersonCapUSD) {
+            revert ExceedsPerPersonCap(usdAmount, perPersonCapUSD - spent);
+        }
 
-        // 4. Calculate GToken amount to be received
-        // TODO: For simplicity, this example uses current price. A real implementation
-        // should integrate over the curve for large purchases.
-        uint256 currentPrice = getCurrentPriceUSD();
-        uint256 gTokenAmount = (usdAmount * 1e18) / currentPrice;
-        require(tokensSold + gTokenAmount <= totalTokensForSale, "Purchase exceeds available tokens");
+        // 4. Calculate GToken amount
+        uint256 gTokenAmount = getTokensForUSD(usdAmount);
 
-        // 5. Handle payment
-        // TODO: Use a Chainlink price feed to convert usdAmount to the equivalent
-        // amount of paymentToken. For this example, we assume paymentToken is USDC (6 decimals) and 1:1 with USD.
-        ERC20 paymentERC20 = ERC20(paymentToken);
-        paymentERC20.safeTransferFrom(msg.sender, treasury, usdAmount);
+        // 5. Inventory check
+        uint256 inventory = availableInventory();
+        if (gTokenAmount > inventory) revert InsufficientInventory(gTokenAmount, inventory);
 
-        // 6. Update state
-        tokensSold += gTokenAmount;
-        hasBought[msg.sender] = true;
+        // 6. Transfer payment to treasury
+        IERC20(paymentToken).safeTransferFrom(msg.sender, treasury, usdAmount);
 
-        // 7. Transfer GTokens
+        // 7. Transfer GTokens to buyer
         gToken.safeTransfer(msg.sender, gTokenAmount);
 
-        emit TokensPurchased(msg.sender, gTokenAmount, usdAmount);
+        // 8. Update state
+        totalRevenue += usdAmount;
+        totalTokensSold += gTokenAmount;
+        userTotalSpent[msg.sender] = spent + usdAmount;
+
+        emit TokensPurchased(
+            msg.sender,
+            paymentToken,
+            usdAmount,
+            gTokenAmount,
+            getCurrentPriceUSD(),
+            currentMilestone
+        );
     }
 
-
     // =============================================================
-    //                        ADMIN FUNCTIONS
+    //                       ADMIN FUNCTIONS
     // =============================================================
 
-    function setWhitelistVerifier(address newVerifier) external onlyOwner {
-        require(newVerifier != address(0), "Zero address");
-        whitelistVerifier = newVerifier;
-        emit WhitelistVerifierUpdated(newVerifier);
+    /**
+     * @notice Advance to the next milestone if totalRevenue has reached its revenueCap.
+     * @dev Only callable by owner. Validates that cumulative revenue is sufficient.
+     */
+    function advanceMilestone() external onlyOwner {
+        if (currentMilestone >= 5) revert AlreadyAtMaxMilestone();
+
+        uint256 nextMilestone = currentMilestone + 1;
+        uint256 required = _milestones[nextMilestone].revenueCap;
+
+        if (totalRevenue < required) {
+            revert MilestoneNotReached(totalRevenue, required);
+        }
+
+        currentMilestone = nextMilestone;
+        emit MilestoneAdvanced(nextMilestone, _milestones[nextMilestone].priceUSD);
     }
 
+    /**
+     * @notice Set whether a token is accepted as payment.
+     * @param token ERC20 token address
+     * @param accepted True to accept, false to reject
+     */
+    function setPaymentToken(address token, bool accepted) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        acceptedTokens[token] = accepted;
+        emit PaymentTokenSet(token, accepted);
+    }
+
+    /**
+     * @notice Enable or disable whitelist requirement.
+     */
+    function setWhitelistRequired(bool required) external onlyOwner {
+        whitelistRequired = required;
+    }
+
+    /**
+     * @notice Batch-set whitelist status for users.
+     * @param users Array of addresses
+     * @param status True to whitelist, false to remove
+     */
+    function setWhitelisted(address[] calldata users, bool status) external onlyOwner {
+        for (uint256 i = 0; i < users.length; i++) {
+            isWhitelisted[users[i]] = status;
+            emit WhitelistUpdated(users[i], status);
+        }
+    }
+
+    /**
+     * @notice Update the per-person purchase cap.
+     * @param capUSD New cap in USD (6 decimals)
+     */
+    function setPerPersonCap(uint256 capUSD) external onlyOwner {
+        if (capUSD == 0) revert ZeroAmount();
+        perPersonCapUSD = capUSD;
+        emit PerPersonCapUpdated(capUSD);
+    }
+
+    /**
+     * @notice Update the treasury address.
+     * @param newTreasury New treasury address
+     */
     function setTreasury(address newTreasury) external onlyOwner {
-        require(newTreasury != address(0), "Zero address");
+        if (newTreasury == address(0)) revert ZeroAddress();
         treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
     /**
-     * @notice Withdraw any accumulated ETH to the treasury.
+     * @notice Recover any ERC20 token accidentally sent to this contract.
+     * @dev Transfers the full balance of the token to treasury.
+     * @param token ERC20 token to recover
      */
-    function withdrawEther() external onlyOwner {
-        uint256 balance = address(this).balance;
+    function recoverToken(address token) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
+        uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
-            (bool success, ) = treasury.call{value: balance}("");
-            require(success, "Ether transfer failed");
+            IERC20(token).safeTransfer(treasury, balance);
         }
     }
 
     /**
-     * @notice In case any GTokens remain unsold after the sale period,
-     * the owner can withdraw them back to the treasury.
+     * @notice Pause the sale.
      */
-    function withdrawUnsoldTokens() external onlyOwner {
-        uint256 remaining = gToken.balanceOf(address(this));
-        if (remaining > 0) {
-            gToken.safeTransfer(treasury, remaining);
-        }
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpause the sale.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }
