@@ -208,23 +208,43 @@ cast code $YOUR --rpc-url $RPC
 # 应该返回 0xef010041fde128d7a7196b968875ca1491816d360d38b7 (= EIP-7702 prefix + delegate addr)
 ```
 
-### Step 3.2 — 点击撤销
+### Step 3.2 — 点击撤销（**2 次签名**，安全机制要求）
 
 **操作**：滚到页面的"④ 解除委托"区段，点击 **签 + 提交解除委托** 红色按钮。
 
-**预期看到**（MetaMask 弹窗）：EIP-7702 Authorization signing：
+**预期看到（MetaMask 弹窗 1/2）—— EIP-712 RevokeIntent**：
+
+```
+Signature request
+
+Domain
+  name: AirAccountDelegate
+  version: 1
+  chainId: 11155111
+  verifyingContract: <your-EOA-address>
+
+Message (RevokeIntent)
+  buyer:    <your-EOA-address>
+  kind:     REVOKE
+  nonce:    <random>
+  deadline: <unix ts now + 600>
+```
+
+> 为什么要这一步：Codex security review 要求——单独的"用户同意撤销"签名，
+> 防止第三方拿到你的 zero-auth 之后**绕过你的同意**让 relayer 替你撤销。
+
+**操作**：点 **Sign** → 日志显示 `✓ RevokeIntent 已签`。
+
+**预期看到（MetaMask 弹窗 2/2）—— EIP-7702 Authorization**：
+
 ```
 Authorize delegation
-  Contract: 0x0000000000000000000000000000000000000000   ← 关键：零地址表示清除
-  Chain: Sepolia
-  Nonce: <next>
+  Contract: 0x0000000000000000000000000000000000000000   ← 零地址 = 清除委托
+  Chain:    Sepolia
+  Nonce:    <next-tx-nonce>
 ```
 
-**操作**：点 **Sign**。
-
-**预期看到**：
-- 日志 `提交到 relayer /v2/revoke...`
-- 然后 `✓ 委托已撤销: 0xdef456...`
+**操作**：点 **Sign** → 日志显示 `③ 提交到 relayer /v2/revoke...` → `✓ 委托已撤销: 0xdef456...`
 
 ### Step 3.3 — 撤销后的状态确认
 
