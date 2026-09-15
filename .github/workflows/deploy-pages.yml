@@ -43,6 +43,10 @@ jobs:
           # 首页必须真的是花园页，别把空壳推上线
           grep -q 'garden-stage' site/index.html
           grep -q 'MYCELIUM_GOODS' site/assets/goods-data.js
+          # 每个页面的 <head> 都要带 AdSense，ads.txt 也得在根目录
+          missing=$(grep -L 'adsbygoogle.js?client=ca-pub-3323568150935057' site/*.html || true)
+          if [ -n "$missing" ]; then echo "缺 AdSense 代码：$missing"; exit 1; fi
+          grep -q 'pub-3323568150935057' site/ads.txt
           echo "site/ 校验通过（$(find site -type f | wc -l) 个文件）"
 
       # 每次构建盖一个唯一戳（commit SHA）。verify 步骤靠它判断线上到底是不是

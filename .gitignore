@@ -156,3 +156,11 @@ research/zuaec/claude-sessions/*.jsonl
 
 # 由部署 workflow 在 CI 里生成的构建戳
 site/build-stamp.txt
+
+# 本地工具产物（每台机器各自生成，不进仓库）
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.codegraph/
+.nezha/
+reviews/model-evals/
+.playwright-mcp/
