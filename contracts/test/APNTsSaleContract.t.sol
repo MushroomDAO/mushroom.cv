@@ -283,14 +283,16 @@ contract APNTsSaleContractTest is Test {
     }
 
     function test_Admin_SetPaymentToken() public {
-        address newToken = makeAddr("newToken");
+        // setPaymentToken enforces a 6-decimal stablecoin (Codex MEDIUM-3 fix),
+        // so the candidate must be a real 6-dec ERC20, not a bare EOA.
+        MockUSDC newToken = new MockUSDC();
         vm.prank(owner);
-        saleContract.setPaymentToken(newToken, true);
-        assertTrue(saleContract.acceptedPaymentTokens(newToken));
+        saleContract.setPaymentToken(address(newToken), true);
+        assertTrue(saleContract.acceptedPaymentTokens(address(newToken)));
 
         vm.prank(owner);
-        saleContract.setPaymentToken(newToken, false);
-        assertFalse(saleContract.acceptedPaymentTokens(newToken));
+        saleContract.setPaymentToken(address(newToken), false);
+        assertFalse(saleContract.acceptedPaymentTokens(address(newToken)));
     }
 
     function test_Admin_SetPurchaseLimits() public {
@@ -392,5 +394,66 @@ contract APNTsSaleContractTest is Test {
 
         vm.prank(owner);
         saleContract.setPrice(newPrice);
+    }
+
+    // =================================================
+    // buyAPNTsFor: self-pay with explicit recipient (SDK#145 gap 2)
+    // =================================================
+
+    function test_BuyAPNTsFor_CreditsRecipient() public {
+        address recipient = makeAddr("airaccount");
+        uint256 usdAmount = 1_000_000; // $1.00 → 50 aPNTs
+        uint256 expected = saleContract.getAPNTsForUSD(usdAmount);
+
+        vm.startPrank(user1);
+        usdc.approve(address(saleContract), usdAmount);
+        uint256 out = saleContract.buyAPNTsFor(recipient, usdAmount, address(usdc));
+        vm.stopPrank();
+
+        assertEq(out, expected, "returns minted amount");
+        assertEq(aPNTs.balanceOf(recipient), expected, "recipient gets aPNTs");
+        assertEq(aPNTs.balanceOf(user1), 0, "payer gets nothing");
+        assertEq(usdc.balanceOf(treasury), usdAmount, "payment pulled from payer");
+        assertEq(saleContract.totalSold(), expected);
+    }
+
+    function test_BuyAPNTsFor_ZeroRecipientReverts() public {
+        vm.startPrank(user1);
+        usdc.approve(address(saleContract), 1_000_000);
+        vm.expectRevert(APNTsSaleContract.ZeroAddress.selector);
+        saleContract.buyAPNTsFor(address(0), 1_000_000, address(usdc));
+        vm.stopPrank();
+    }
+
+    function test_BuyAPNTs_StillCreditsSelf() public {
+        uint256 usdAmount = 1_000_000;
+        uint256 expected = saleContract.getAPNTsForUSD(usdAmount);
+        vm.startPrank(user1);
+        usdc.approve(address(saleContract), usdAmount);
+        saleContract.buyAPNTs(usdAmount, address(usdc));
+        vm.stopPrank();
+        assertEq(aPNTs.balanceOf(user1), expected, "legacy path unchanged");
+    }
+
+    // ─── release hardening: self-recipient reject / recipient event ──
+
+    function test_BuyAPNTsFor_RejectsSelfRecipient() public {
+        vm.startPrank(user1);
+        usdc.approve(address(saleContract), 1_000_000);
+        vm.expectRevert(APNTsSaleContract.ZeroAddress.selector);
+        saleContract.buyAPNTsFor(address(saleContract), 1_000_000, address(usdc));
+        vm.stopPrank();
+    }
+
+    function test_APNTsPurchasedFor_emitted_on_buyFor() public {
+        address recipient = makeAddr("airaccount2");
+        uint256 usdAmount = 1_000_000;
+        uint256 expected = saleContract.getAPNTsForUSD(usdAmount);
+        vm.startPrank(user1);
+        usdc.approve(address(saleContract), usdAmount);
+        vm.expectEmit(true, true, true, true);
+        emit APNTsSaleContract.APNTsPurchasedFor(user1, recipient, address(usdc), expected, usdAmount, DEFAULT_PRICE);
+        saleContract.buyAPNTsFor(recipient, usdAmount, address(usdc));
+        vm.stopPrank();
     }
 }

@@ -194,4 +194,103 @@ contract SaleContractV2Test is Test {
         assertEq(sale.VERSION(), 20000);
         assertEq(sale.version(), "2.0.0");
     }
+
+    // ─── buyTokensFor: self-pay with explicit recipient (SDK#145 gap 2) ──
+
+    function test_buyTokensFor_credits_recipient() public {
+        uint256 usd = 150 * 1e6; // $150 → 1000 GT @ $0.15
+        vm.prank(alice);
+        uint256 out = sale.buyTokensFor(bob, usd, address(usdc), 0);
+
+        assertEq(out, 1000 * 1e18, "returns minted amount");
+        assertEq(gt.balanceOf(bob), 1000 * 1e18, "recipient gets GToken");
+        assertEq(gt.balanceOf(alice), 0, "payer gets nothing");
+        assertEq(usdc.balanceOf(treasury), usd, "payment pulled from payer");
+        assertEq(sale.userTotalSpent(alice), usd, "cap charged to payer");
+        assertEq(sale.userTotalSpent(bob), 0, "recipient cap untouched");
+    }
+
+    function test_buyTokensFor_zero_recipient_reverts() public {
+        vm.prank(alice);
+        vm.expectRevert(SaleContractV2.ZeroAddress.selector);
+        sale.buyTokensFor(address(0), 150 * 1e6, address(usdc), 0);
+    }
+
+    function test_buyTokensFor_respects_slippage() public {
+        // $150 yields exactly 1000 GT; requiring 1001 must revert.
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(SaleContractV2.SlippageExceeded.selector, 1000 * 1e18, 1001 * 1e18)
+        );
+        sale.buyTokensFor(bob, 150 * 1e6, address(usdc), 1001 * 1e18);
+    }
+
+    function test_buyTokens_still_credits_self() public {
+        vm.prank(alice);
+        sale.buyTokens(150 * 1e6, address(usdc), 0);
+        assertEq(gt.balanceOf(alice), 1000 * 1e18, "legacy path unchanged");
+    }
+
+    // ─── release hardening: cap exemption / self-recipient / recipient event ──
+
+    function test_buyTokensFor_rejects_self_recipient() public {
+        vm.prank(alice);
+        vm.expectRevert(SaleContractV2.ZeroAddress.selector);
+        sale.buyTokensFor(address(sale), 150 * 1e6, address(usdc), 0);
+    }
+
+    function test_capExempt_skips_per_person_cap() public {
+        // Lower cap to $100; exempt alice → she can exceed it (mirrors BuyHelper).
+        vm.startPrank(owner);
+        sale.setPerPersonCap(100 * 1e6);
+        sale.setCapExempt(alice, true);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        sale.buyTokens(150 * 1e6, address(usdc), 0); // $150 > $100 cap, but exempt
+        sale.buyTokens(150 * 1e6, address(usdc), 0);
+        vm.stopPrank();
+        assertEq(gt.balanceOf(alice), 2000 * 1e18, "exempt payer bypasses cap");
+    }
+
+    function test_cap_still_enforced_for_non_exempt() public {
+        vm.prank(owner);
+        sale.setPerPersonCap(100 * 1e6);
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(SaleContractV2.ExceedsPerPersonCap.selector, 150 * 1e6, 100 * 1e6)
+        );
+        sale.buyTokens(150 * 1e6, address(usdc), 0);
+    }
+
+    function test_setCapExempt_owner_only() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        sale.setCapExempt(alice, true);
+    }
+
+    function test_TokensPurchasedFor_emitted_on_buyFor() public {
+        vm.expectEmit(true, true, true, true);
+        emit SaleContractV2.TokensPurchasedFor(alice, bob, address(usdc), 150 * 1e6, 1000 * 1e18, 150_000, 0);
+        vm.prank(alice);
+        sale.buyTokensFor(bob, 150 * 1e6, address(usdc), 0);
+    }
+
+    // ── audit #5: a newly-added milestone whose cap is already met advances now ──
+
+    function test_addMilestone_advances_if_already_met() public {
+        // Drive revenue past the last seeded milestone (M5 cap $135.8K).
+        vm.prank(owner);
+        sale.setPerPersonCap(10_000_000 * 1e6);
+        usdc.mint(alice, 10_000_000 * 1e6);
+        vm.prank(alice);
+        sale.buyTokens(200_000 * 1e6, address(usdc), 0); // $200K revenue → advances to M5
+        assertEq(sale.currentMilestone(), 5, "at last seeded milestone");
+
+        // Append M6 with cap $150K (< $200K revenue): must auto-advance immediately.
+        vm.prank(owner);
+        sale.addMilestone(300_000, 150_000_000_000); // $0.30 @ $150K cap
+        assertEq(sale.currentMilestone(), 6, "auto-advanced to already-met new milestone");
+        assertEq(sale.getCurrentPriceUSD(), 300_000, "next buy uses new price, not stale");
+    }
 }

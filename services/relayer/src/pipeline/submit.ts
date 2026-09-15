@@ -7,10 +7,10 @@ import {
   createWalletClient,
   createPublicClient,
   http,
-  privateKeyToAccount,
   type Hex,
   type Address,
 } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import type { BuiltTx } from './build.js'
 import type { Authorization } from '../types.js'

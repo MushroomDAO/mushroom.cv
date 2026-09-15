@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭐</text></svg>" />
+<title>AAStar · Infrastructure for Builders & Operators</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<style>
+  :root { --bg:#020617; --cyan:#22d3ee; --yellow:#fbbf24; --green:#4ade80; --orange:#fb923c; --purple:#a78bfa; --slate:#94a3b8; --border:rgba(34,211,238,0.25); }
+  body { background: var(--bg); color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .bg-grid { position: fixed; inset: 0; z-index: -1;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 50px 50px; mask-image: radial-gradient(circle at 50% 30%, black, transparent 75%); opacity: 0.12; }
+  .glass { background: rgba(15,23,42,0.7); border: 1px solid var(--border); border-radius: 12px; backdrop-filter: blur(8px); transition: all 0.3s; }
+  .glass:hover { border-color: var(--cyan); box-shadow: 0 0 20px rgba(34,211,238,0.1); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 10px 14px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; border-bottom: 1px solid rgba(34,211,238,0.2); }
+  td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(34,211,238,0.03); }
+  .glow-cyan { text-shadow: 0 0 18px rgba(34,211,238,0.4); }
+  .glow-yellow { text-shadow: 0 0 18px rgba(251,191,36,0.4); }
+  .cyan-text { color: var(--cyan); }
+  .yellow-text { color: var(--yellow); }
+  .green-text { color: var(--green); }
+  .orange-text { color: var(--orange); }
+  .purple-text { color: var(--purple); }
+  .nav-link { color:#94a3b8; font-size:0.85rem; transition:color 0.2s; text-decoration:none; }
+  .nav-link:hover { color: var(--cyan); }
+  .divider { height:1px; background:linear-gradient(to right, transparent, var(--border), transparent); }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<!-- NAV -->
+<nav class="fixed top-0 left-0 right-0 z-50 backdrop-blur" style="background: rgba(2,6,23,0.92); border-bottom: 1px solid var(--border);">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+    <span style="color: var(--cyan); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.15em;">AASTAR</span>
+    <div class="flex gap-5 text-sm">
+      <a href="https://launch.mushroom.cv" class="nav-link" target="_blank" rel="noopener">Launch</a>
+      <a href="https://blog.mushroom.cv" class="nav-link" target="_blank" rel="noopener">Blog</a>
+      <a href="https://launch.mushroom.cv/auraai.html" class="nav-link" target="_blank" rel="noopener">AuraAI</a>
+      <a href="https://aastar.io" class="nav-link" target="_blank" rel="noopener" style="color:var(--yellow)">aastar.io ↗</a>
+      <a href="https://github.com/AAStarCommunity" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<div class="max-w-6xl mx-auto px-6 pt-24 pb-16 space-y-12">
+
+  <!-- HERO -->
+  <header class="text-center space-y-5">
+    <img src="https://raw.githubusercontent.com/jhfnetboy/MarkDownImg/main/img/202509171600702.png"
+         alt="AAStar logo" class="mx-auto" style="width:140px;height:auto;filter:drop-shadow(0 0 20px rgba(34,211,238,0.4))">
+    <h1 class="text-5xl font-bold glow-cyan cyan-text">AAStar</h1>
+    <p class="text-xl text-slate-300 font-light max-w-3xl mx-auto leading-relaxed">
+      Account Abstraction infrastructure for <strong class="text-white">builders</strong> and
+      <strong class="text-white">operators</strong>.
+    </p>
+    <p class="text-sm text-slate-400">
+      Open-source · Apache-2.0 · Battle-tested on Sepolia · Production-ready for v0.7 (Pectra) accounts
+    </p>
+    <div class="flex justify-center gap-3 pt-3 flex-wrap">
+      <a href="https://github.com/AAStarCommunity" target="_blank" rel="noopener" class="tag" style="background:rgba(34,211,238,0.1); color:var(--cyan); border:1px solid rgba(34,211,238,0.3); padding:6px 14px;">
+        <i class="fab fa-github mr-1"></i> GitHub
+      </a>
+      <a href="https://aastar.io" target="_blank" rel="noopener" class="tag" style="background:rgba(251,191,36,0.1); color:var(--yellow); border:1px solid rgba(251,191,36,0.3); padding:6px 14px;">
+        <i class="fas fa-globe mr-1"></i> aastar.io
+      </a>
+      <a href="https://t.me/Account_Abstraction_Community" target="_blank" rel="noopener" class="tag" style="background:rgba(34,211,238,0.08); color:var(--cyan); border:1px solid rgba(34,211,238,0.2); padding:6px 14px;">
+        <i class="fab fa-telegram mr-1"></i> Telegram
+      </a>
+    </div>
+  </header>
+
+  <div class="divider"></div>
+
+  <!-- INTRO -->
+  <section class="glass p-7 space-y-4">
+    <h2 class="text-2xl cyan-text font-bold">Why AAStar</h2>
+    <p class="text-slate-300 leading-relaxed">
+      Web3 hasn't gone mainstream because using it is hard: gas, seed phrases, chain-switching, wallet UX.
+      AAStar 是一组**面向 builder 的 ERC-4337 + EIP-7702 基础设施组件**——每一个都
+      <strong class="text-white">完全开源 (Apache 2.0)</strong>，
+      解决一个独立的 Web3 难用痛点，组合起来让任何应用都能给用户提供
+      <strong class="cyan-text">Web2-grade UX</strong>。
+    </p>
+    <p class="text-slate-400 text-sm leading-relaxed">
+      所有合约 + 服务部署在 Sepolia 公开测试，<strong>已 Etherscan verified</strong>。Operator 角色由
+      <code class="cyan-text">SuperPaymaster v5.3.3</code> 的 Registry 合约统一治理（GToken 质押 + Soul-Bound Token 身份），
+      详见下方 <a href="#operators" class="cyan-text hover:underline">生态运营者</a> 区段。
+    </p>
+  </section>
+
+  <!-- COMPONENTS -->
+  <section class="space-y-5">
+    <h2 class="text-2xl cyan-text font-bold">核心组件 / Components for Builders</h2>
+    <p class="text-slate-400 text-sm">
+      All Apache 2.0 license. Use freely, fork freely, no permission needed. Production licenses + commercial Pro services
+      via <a href="https://launch.mushroom.cv" class="cyan-text hover:underline">HyperCapital</a>.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <!-- AirAccount -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold yellow-text"><i class="fas fa-fingerprint mr-2"></i>AirAccount</h3>
+          <span class="tag" style="background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3);">Beta</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">解决</strong>：私钥太难管。用 WebAuthn / Passkey + TEE-backed BLS 把 EOA 私钥替换成
+          指纹/Face ID，体验等价于 Apple ID 登录。
+        </p>
+        <p class="text-xs text-slate-400">
+          <strong class="text-white">如何用</strong>：集成 <code class="cyan-text">@aastar/airaccount</code> SDK，
+          1 行代码替换 wagmi/ethers connector。HSM (Optee) 可选硬件后端，企业级 KMS 可挂。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AAStarCommunity/airaccount" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>airaccount</a>
+          <a href="https://github.com/AAStarCommunity/airaccount-contract" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>airaccount-contract</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- SuperPaymaster -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold yellow-text"><i class="fas fa-gas-pump mr-2"></i>SuperPaymaster</h3>
+          <span class="tag" style="background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3);">v5.3 Live Sepolia</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">解决</strong>：用户没 ETH 也得能用你的应用。可扩展的 ERC-4337 paymaster proxy —
+          多个 operator 共享一套合约，按 PNTs 计费、按 SBT 准入、按 SLA 路由。
+        </p>
+        <p class="text-xs text-slate-400">
+          <strong class="text-white">如何用</strong>：接 <code class="cyan-text">paymasterAndData</code> 走 SuperPaymaster proxy；
+          或自己跑一个 PaymasterV4 (单机版) 用 PaymasterFactory 部署。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AAStarCommunity/SuperPaymaster" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>SuperPaymaster</a>
+          <a href="https://sepolia.etherscan.io/address/0x33404ccD9559759b85302cFfB19e66dA25380aDf" target="_blank" rel="noopener" class="nav-link"><i class="fas fa-link mr-1"></i>Etherscan</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- YetAnotherAA -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold yellow-text"><i class="fas fa-shapes mr-2"></i>YetAnotherAA</h3>
+          <span class="tag" style="background:rgba(251,191,36,0.1); color:var(--yellow); border:1px solid rgba(251,191,36,0.3);">v0.7 / 7702</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">解决</strong>：ERC-4337 v0.7 + EIP-7702 双模式智能账户实现，BLS 多签签名聚合，
+          可执行 batched calls / sponsored ops / 自定义验证逻辑。
+        </p>
+        <p class="text-xs text-slate-400">
+          <strong class="text-white">如何用</strong>：用 YetAnotherAA contract 作为 EOA 的 7702 delegate；
+          或部署成独立 smart account；可作为 AirAccountDelegate 的扩展实现。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AAStarCommunity/YetAnotherAA" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>YetAnotherAA</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- aastar-sdk -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold yellow-text"><i class="fas fa-cube mr-2"></i>AAStar SDK</h3>
+          <span class="tag" style="background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3);">TS / JS</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">解决</strong>：把上面的合约和服务封装成 dev-friendly 一行集成 SDK。
+          包含 AirAccount login + SuperPaymaster billing + CometENS 子域名 + signing helpers。
+        </p>
+        <p class="text-xs text-slate-400">
+          <strong class="text-white">如何用</strong>：<code class="cyan-text">npm i @aastar/sdk</code>，
+          5 分钟跑通"邮箱注册 + gasless 第一笔交易"demo。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AAStarCommunity/aastar-sdk" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>aastar-sdk</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- OPERATORS -->
+  <section id="operators" class="space-y-5">
+    <div>
+      <h2 class="text-2xl cyan-text font-bold">生态运营者 / Ecosystem Operators</h2>
+      <p class="text-slate-400 text-sm mt-2">
+        AAStar 不只是给开发者用的库——它也是一个**多角色运营生态**。任何人都可以质押 GToken
+        申请下面 7 个 Operator 角色之一，运行节点 / 提供服务，赚取 PNTs 收入。所有角色 + 罚没 + 信誉
+        逻辑由 <a href="https://sepolia.etherscan.io/address/0xa62EFc8a9138617E245bd21BcF5b5E406D864525#code" target="_blank" rel="noopener" class="cyan-text hover:underline">Registry v5.3.3 合约</a>
+        统一治理。
+      </p>
+    </div>
+
+    <div class="glass overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:130px">角色 / Role</th>
+            <th>职责</th>
+            <th style="min-width:90px">最低质押</th>
+            <th style="min-width:80px">门票<br/><span class="text-[10px] normal-case">GToken burn</span></th>
+            <th style="min-width:120px">Stake 锁定期</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong class="yellow-text">KMS</strong><br/><span class="text-[10px] text-slate-500">Key Management Service</span></td>
+            <td class="text-xs text-slate-300">企业级密钥托管 / TEE 节点。运行 OPTee 或 HSM，托管 AirAccount 用户的硬件钱包凭证。
+              最严苛的 SLA，最高的 stake / 罚没。</td>
+            <td class="text-xs font-mono yellow-text">100 GT</td>
+            <td class="text-xs font-mono">10 GT</td>
+            <td class="text-xs text-slate-400">30 天</td>
+          </tr>
+          <tr>
+            <td><strong class="yellow-text">PAYMASTER_SUPER</strong><br/><span class="text-[10px] text-slate-500">SuperPaymaster Op</span></td>
+            <td class="text-xs text-slate-300">运行 SuperPaymaster proxy 实例——为整个生态付 gas。需高可用、跨链支持、
+              低延迟 RPC、PNTs 锁定流动性。</td>
+            <td class="text-xs font-mono yellow-text">50 GT</td>
+            <td class="text-xs font-mono">5 GT</td>
+            <td class="text-xs text-slate-400">30 天</td>
+          </tr>
+          <tr>
+            <td><strong class="yellow-text">PAYMASTER_AOA</strong><br/><span class="text-[10px] text-slate-500">Account-Owned Account</span></td>
+            <td class="text-xs text-slate-300">单一账户 paymaster——为特定 dApp 或社区代付 gas（轻量、自治）。
+              用 PaymasterFactory 一键部署。</td>
+            <td class="text-xs font-mono yellow-text">30 GT</td>
+            <td class="text-xs font-mono">3 GT</td>
+            <td class="text-xs text-slate-400">30 天</td>
+          </tr>
+          <tr>
+            <td><strong class="yellow-text">DVT</strong><br/><span class="text-[10px] text-slate-500">Distributed Validator</span></td>
+            <td class="text-xs text-slate-300">分布式验证节点——参与 BLS 签名聚合、共识、链下计算验证。运行
+              <code class="cyan-text">DVTValidator</code> 合约。</td>
+            <td class="text-xs font-mono yellow-text">30 GT</td>
+            <td class="text-xs font-mono">3 GT</td>
+            <td class="text-xs text-slate-400">30 天</td>
+          </tr>
+          <tr>
+            <td><strong class="yellow-text">ANODE</strong><br/><span class="text-[10px] text-slate-500">Aggregator Node (BLS)</span></td>
+            <td class="text-xs text-slate-300">BLS 签名聚合器节点。把多个 DVT 验证的签名聚合成一个，提交到
+              <code class="cyan-text">BLSAggregator</code> 合约。降低链上 gas，提高吞吐。</td>
+            <td class="text-xs font-mono yellow-text">20 GT</td>
+            <td class="text-xs font-mono">2 GT</td>
+            <td class="text-xs text-slate-400">30 天</td>
+          </tr>
+          <tr>
+            <td><strong class="cyan-text">COMMUNITY</strong><br/><span class="text-[10px] text-slate-500">Community Node</span></td>
+            <td class="text-xs text-slate-300">社区运营方——任何能聚集 ≥50 人组织的发起人。注册社区域名 (ENS)、
+              在 CoS72 上运营任务/投票/积分。无最低 stake、纯门票准入。</td>
+            <td class="text-xs font-mono">0</td>
+            <td class="text-xs font-mono cyan-text">30 GT</td>
+            <td class="text-xs text-slate-400">—</td>
+          </tr>
+          <tr>
+            <td><strong class="cyan-text">ENDUSER</strong><br/><span class="text-[10px] text-slate-500">Individual User</span></td>
+            <td class="text-xs text-slate-300">协议的终身用户——任何持有 ≥0.3 GToken 的个人。能用所有公共品（AirAccount、
+              Cos72、Sin90 等），可参与积分网络作为表达者/创作者/建设者。</td>
+            <td class="text-xs font-mono">0</td>
+            <td class="text-xs font-mono cyan-text">0.3 GT</td>
+            <td class="text-xs text-slate-400">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-xs text-slate-500">
+      <strong>怎么申请</strong>：在 <a href="https://sepolia.etherscan.io/address/0xa62EFc8a9138617E245bd21BcF5b5E406D864525#writeContract" target="_blank" rel="noopener" class="cyan-text hover:underline">Registry Write Contract</a>
+      调 <code class="cyan-text">grantRole(roleId, address, stakeAmount, metadata)</code> 即可（先在 GToken 上 approve 给 GTokenStaking）。
+      详细文档：<a href="https://github.com/AAStarCommunity/SuperPaymaster" target="_blank" rel="noopener" class="cyan-text hover:underline">SuperPaymaster repo</a>。
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- LICENSE / WHY OPEN SOURCE -->
+  <section class="glass p-7 space-y-4">
+    <h2 class="text-2xl cyan-text font-bold">License & Open Source</h2>
+    <p class="text-slate-300 text-sm leading-relaxed">
+      所有 AAStar 组件采用 <strong class="text-white">Apache License 2.0</strong>：
+    </p>
+    <ul class="text-sm text-slate-400 space-y-2 pl-5 list-disc">
+      <li>✅ <strong>自由使用</strong>：商业、私有、修改、再分发，无需许可</li>
+      <li>✅ <strong>无版权传染</strong>：不会强制开源你的应用代码</li>
+      <li>✅ <strong>专利授权明示</strong>：贡献者明确授予使用其专利的权利</li>
+      <li>⚠ <strong>保留商标</strong>：AAStar / MushroomDAO 名称是注册商标，不可在产品名中混用</li>
+    </ul>
+    <p class="text-sm text-slate-400">
+      生产环境支持 + Pro 服务由 <a href="https://launch.mushroom.cv" class="cyan-text hover:underline" target="_blank">HyperCapital</a>
+      提供（独家商业授权方，40% 收入回流社区国库）。
+    </p>
+  </section>
+
+  <!-- CTA -->
+  <section class="text-center space-y-3 py-8">
+    <p class="text-slate-400">想用 AAStar 构建？</p>
+    <div class="flex justify-center gap-3 flex-wrap">
+      <a href="https://github.com/AAStarCommunity" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(34,211,238,0.15); color:var(--cyan); border:1px solid rgba(34,211,238,0.4); text-decoration:none;">
+        <i class="fab fa-github mr-1"></i> Star on GitHub
+      </a>
+      <a href="https://launch.mushroom.cv/join-gasless.html" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(251,191,36,0.15); color:var(--yellow); border:1px solid rgba(251,191,36,0.4); text-decoration:none;">
+        ⚡ Try Gasless Buy
+      </a>
+      <a href="https://aastar.io" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(15,23,42,0.5); color:#cbd5e1; border:1px solid rgba(255,255,255,0.1); text-decoration:none;">
+        aastar.io Full Site ↗
+      </a>
+    </div>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 pt-8 border-t" style="border-color: rgba(255,255,255,0.05);">
+    AAStar Community · Account Abstraction for Real Humans · Apache 2.0
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+<title>AuraAI · AI-Native Components for Open Ecosystems</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<style>
+  :root { --bg:#020617; --cyan:#22d3ee; --yellow:#fbbf24; --purple:#a78bfa; --green:#4ade80; --orange:#fb923c; --slate:#94a3b8; --border:rgba(167,139,250,0.3); }
+  body { background: var(--bg); color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .bg-grid { position: fixed; inset: 0; z-index: -1;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 50px 50px; mask-image: radial-gradient(circle at 50% 30%, black, transparent 75%); opacity: 0.12; }
+  .glass { background: rgba(15,23,42,0.7); border: 1px solid var(--border); border-radius: 12px; backdrop-filter: blur(8px); transition: all 0.3s; }
+  .glass:hover { border-color: var(--purple); box-shadow: 0 0 20px rgba(167,139,250,0.1); }
+  .glass-card { background: rgba(15,23,42,0.85); border: 1px solid rgba(167,139,250,0.25); border-radius: 12px; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .glow-purple { text-shadow: 0 0 24px rgba(167,139,250,0.5); }
+  .cyan-text { color: var(--cyan); }
+  .yellow-text { color: var(--yellow); }
+  .purple-text { color: var(--purple); }
+  .green-text { color: var(--green); }
+  .nav-link { color:#94a3b8; font-size:0.85rem; transition:color 0.2s; text-decoration:none; }
+  .nav-link:hover { color: var(--purple); }
+  .divider { height:1px; background:linear-gradient(to right, transparent, var(--border), transparent); }
+  .gradient-border { position: relative; }
+  .gradient-border::before {
+    content: ''; position: absolute; inset: -1px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--purple), var(--cyan), var(--yellow), var(--orange));
+    z-index: -1; opacity: 0.4;
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<!-- NAV -->
+<nav class="fixed top-0 left-0 right-0 z-50 backdrop-blur" style="background: rgba(2,6,23,0.92); border-bottom: 1px solid var(--border);">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+    <span style="color: var(--purple); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.15em;">AURAAI</span>
+    <div class="flex gap-5 text-sm">
+      <a href="https://launch.mushroom.cv" class="nav-link" target="_blank" rel="noopener">Launch</a>
+      <a href="https://blog.mushroom.cv" class="nav-link" target="_blank" rel="noopener">Blog</a>
+      <a href="https://aastar.io" class="nav-link" target="_blank" rel="noopener">AAStar</a>
+      <a href="https://github.com/AuraAIHQ" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<div class="max-w-6xl mx-auto px-6 pt-24 pb-16 space-y-12">
+
+  <!-- HERO -->
+  <header class="text-center space-y-6">
+    <img src="https://raw.githubusercontent.com/jhfnetboy/MarkDownImg/main/img/202602121145231.jpg"
+         alt="AuraAI logo" class="mx-auto rounded-lg"
+         style="width:180px;height:auto;filter:drop-shadow(0 0 30px rgba(167,139,250,0.5))">
+    <h1 class="text-5xl font-bold glow-purple purple-text">AuraAI</h1>
+    <p class="text-xl text-slate-300 font-light max-w-3xl mx-auto leading-relaxed">
+      <strong class="text-white">Self-Evolving Agents</strong>:<br/>
+      Empowering Individual, Communities and Cities.
+    </p>
+    <p class="text-sm text-slate-400 max-w-2xl mx-auto leading-relaxed">
+      为 Mycelium Protocol 开源生态提供 <strong class="purple-text">AI-Native 组件</strong> ——
+      把私有 Agent、社区大脑、跨场景通信、社会资本评估这些"AI 时代基础设施"
+      做成<strong class="text-white">人人可部署</strong>的开源工具。
+    </p>
+    <div class="flex justify-center gap-3 pt-3 flex-wrap">
+      <a href="https://github.com/AuraAIHQ" target="_blank" rel="noopener" class="tag" style="background:rgba(167,139,250,0.1); color:var(--purple); border:1px solid rgba(167,139,250,0.3); padding:6px 14px;">
+        <i class="fab fa-github mr-1"></i> AuraAIHQ
+      </a>
+      <a href="https://blog.mushroom.cv" target="_blank" rel="noopener" class="tag" style="background:rgba(34,211,238,0.1); color:var(--cyan); border:1px solid rgba(34,211,238,0.3); padding:6px 14px;">
+        <i class="fas fa-rss mr-1"></i> Blog & Research
+      </a>
+    </div>
+  </header>
+
+  <div class="divider"></div>
+
+  <!-- MISSION -->
+  <section class="glass-card p-7 space-y-4">
+    <span class="tag" style="background:rgba(167,139,250,0.1); color:var(--purple); border:1px solid rgba(167,139,250,0.3);">MISSION</span>
+    <h2 class="text-2xl purple-text font-bold">为什么是 AuraAI</h2>
+    <p class="text-slate-300 leading-relaxed">
+      AI 正在替代人类的生产力角色，但有三件事 AI 永远替代不了——
+      <strong class="text-white">想象力 (Imagination)</strong>、<strong class="text-white">创造力 (Innovation)</strong>、
+      <strong class="text-white">情感 (Emotion)</strong>。这是<strong class="purple-text">意义经济 (Meaning Economy)</strong>
+      的核心命题：让 AI 处理生产，让人类专注意义。
+    </p>
+    <p class="text-slate-400 text-sm leading-relaxed">
+      为此，AuraAI 围绕三类新角色——
+      <strong class="cyan-text">表达者 / Expressor</strong>、
+      <strong class="cyan-text">创造者 / Creator</strong>、
+      <strong class="cyan-text">建设者 / Builder</strong>
+      ——构建 AI Native 基础设施。每一个 AuraAI 组件都是
+      <strong class="text-white">本地优先 / 隐私安全 / 开源可审计</strong> 的——
+      你的数据不卖给训练公司，你的 Agent 不替别人监控你。
+    </p>
+  </section>
+
+  <!-- POSITIONING -->
+  <section class="space-y-5">
+    <h2 class="text-2xl purple-text font-bold">定位：为开源生态提供 AI-Native 组件</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="glass p-5 space-y-2">
+        <div class="text-2xl">👤</div>
+        <div class="font-bold cyan-text">Individual</div>
+        <p class="text-xs text-slate-400">个人 Agent 团队 · 私有知识管理 · 本地 LLM 部署</p>
+      </div>
+      <div class="glass p-5 space-y-2">
+        <div class="text-2xl">🏘️</div>
+        <div class="font-bold cyan-text">Community</div>
+        <p class="text-xs text-slate-400">社区大脑 · 自动撮合 · 决策辅助 · 跨社区通信</p>
+      </div>
+      <div class="glass p-5 space-y-2">
+        <div class="text-2xl">🌆</div>
+        <div class="font-bold cyan-text">City</div>
+        <p class="text-xs text-slate-400">城市级 AI 操作系统 · 区域协作 · 商业积分撮合网络</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- COMPONENTS -->
+  <section class="space-y-5">
+    <h2 class="text-2xl purple-text font-bold">核心组件 / Core Components</h2>
+    <p class="text-slate-400 text-sm">
+      Apache 2.0 license · Self-hostable · Open weights philosophy（基于 OSS LLM 微调，不绑大厂 API）
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <!-- iDoris -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold purple-text"><i class="fas fa-brain mr-2"></i>iDoris</h3>
+          <span class="tag" style="background:rgba(251,191,36,0.1); color:var(--yellow); border:1px solid rgba(251,191,36,0.3);">Beta</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">社区大脑 / Community Brain</strong>——基于"协议 + 联盟"训练的多层 AI 模型，
+          为社区提供：
+        </p>
+        <ul class="text-xs text-slate-400 space-y-1 pl-4 list-disc">
+          <li>消费建议（基于积分网络中的真实表达）</li>
+          <li>招聘 / 评测 / 合作机会智能匹配</li>
+          <li>投资决策辅助（社会资本评估模型）</li>
+          <li>跨社区资源调度</li>
+        </ul>
+        <p class="text-xs text-slate-500 pt-1">
+          <strong>核心创新</strong>：联邦分层权重训练，每个社区都有自己的私有微调层，但能共享底层知识池。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AuraAIHQ/iDoris" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>iDoris</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- Agent24 -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold purple-text"><i class="fas fa-broadcast-tower mr-2"></i>Agent24</h3>
+          <span class="tag" style="background:rgba(251,191,36,0.1); color:var(--yellow); border:1px solid rgba(251,191,36,0.3);">Beta</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">通信 + 协议 Agent</strong>——24/7 持续运行的智能体，处理跨场景协作：
+        </p>
+        <ul class="text-xs text-slate-400 space-y-1 pl-4 list-disc">
+          <li>跨 IM 平台消息聚合（微信、Telegram、Discord、邮箱）</li>
+          <li>自动安排会议 / 协调 / 任务派发</li>
+          <li>协议层签名（自动签订商业积分跨店结盟合同）</li>
+          <li>超额带宽 = 商业公司收入来源（基础免费，Pro 计费）</li>
+        </ul>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AuraAIHQ/Agent24" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>Agent24</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- OpenCrab -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold purple-text"><i class="fas fa-spider mr-2"></i>OpenCrab</h3>
+          <span class="tag" style="background:rgba(167,139,250,0.1); color:var(--purple); border:1px solid rgba(167,139,250,0.3);">Research</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">分布式数据爬取 + 整理协作框架</strong>——为 iDoris 等下游 AI 提供高质量数据集。
+          社区贡献者可"Operate" OpenCrab 节点赚 PNTs。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/AuraAIHQ/OpenCrab" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>OpenCrab</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+
+      <!-- Sin90 (related but in MushroomDAO repo) -->
+      <div class="glass p-6 space-y-3">
+        <div class="flex items-start justify-between">
+          <h3 class="text-xl font-bold purple-text"><i class="fas fa-user-astronaut mr-2"></i>Sin90 (个人 OS)</h3>
+          <span class="tag" style="background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3);">Beta</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          <strong class="text-white">个人 AI 操作系统</strong>——本地优先的 Agent 团队 + 知识管理 + 隐私数据。
+          运行在用户自己机器上，<strong class="text-white">数据永不上传</strong>。可挂 OpenAI/Claude API
+          或纯本地 LLM (llama.cpp / Ollama)。
+        </p>
+        <div class="flex gap-2 text-xs flex-wrap pt-1">
+          <a href="https://github.com/MushroomDAO/Sin90" target="_blank" rel="noopener" class="nav-link"><i class="fab fa-github mr-1"></i>Sin90</a>
+          <span class="text-slate-500">· Apache 2.0</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- VISION / PHILOSOPHY -->
+  <section class="glass-card p-7 space-y-4">
+    <h2 class="text-2xl purple-text font-bold">愿景 / Vision</h2>
+    <blockquote class="border-l-4 pl-4 py-2 text-slate-300 italic" style="border-color:var(--purple)">
+      "AI 接管生产力——这不是预测，是已经在发生的事。普通人正在失去现金流。<br/>
+      我们做的是给'表达者、创造者、建设者'建一套基础设施——
+      让不能被 AI 替代的能力变成现金流。"
+    </blockquote>
+    <p class="text-slate-400 text-sm leading-relaxed">
+      AuraAI 不和 OpenAI / Anthropic 竞争——我们专注做<strong class="text-white">普通人手里的 AI</strong>。
+      它运行在你的设备上，理解你的私有上下文，处理你的隐私数据，<strong class="purple-text">不卖给任何人</strong>。
+      它的价值不是替代你，而是 <strong class="text-white">放大你</strong>。
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+      <div class="text-center p-3 rounded" style="background:rgba(167,139,250,0.05)">
+        <div class="text-2xl mb-1">🔒</div>
+        <div class="text-xs font-semibold text-white">Privacy-first</div>
+        <div class="text-xs text-slate-400">本地推理 · 数据不出端</div>
+      </div>
+      <div class="text-center p-3 rounded" style="background:rgba(34,211,238,0.05)">
+        <div class="text-2xl mb-1">🔓</div>
+        <div class="text-xs font-semibold text-white">Open Source</div>
+        <div class="text-xs text-slate-400">Apache 2.0 · 全部可审</div>
+      </div>
+      <div class="text-center p-3 rounded" style="background:rgba(251,191,36,0.05)">
+        <div class="text-2xl mb-1">🌱</div>
+        <div class="text-xs font-semibold text-white">Self-Evolving</div>
+        <div class="text-xs text-slate-400">Agent 持续学习 · 用户主权</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="text-center space-y-3 py-8">
+    <p class="text-slate-400">想用 AuraAI 构建？想成为 OpenCrab Operator？</p>
+    <div class="flex justify-center gap-3 flex-wrap">
+      <a href="https://github.com/AuraAIHQ" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(167,139,250,0.15); color:var(--purple); border:1px solid rgba(167,139,250,0.4); text-decoration:none;">
+        <i class="fab fa-github mr-1"></i> AuraAIHQ on GitHub
+      </a>
+      <a href="https://blog.mushroom.cv" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(34,211,238,0.15); color:var(--cyan); border:1px solid rgba(34,211,238,0.4); text-decoration:none;">
+        <i class="fas fa-rss mr-1"></i> Read Research Blog
+      </a>
+      <a href="https://launch.mushroom.cv/join-gasless.html" target="_blank" rel="noopener" class="px-5 py-2 rounded font-semibold" style="background:rgba(251,191,36,0.15); color:var(--yellow); border:1px solid rgba(251,191,36,0.4); text-decoration:none;">
+        ⚡ Buy GToken / aPNTs
+      </a>
+    </div>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 pt-8 border-t" style="border-color: rgba(255,255,255,0.05);">
+    AuraAI · Self-Evolving Agents for Real Humans · Apache 2.0<br/>
+    Part of the <a href="https://launch.mushroom.cv" class="purple-text hover:underline" target="_blank">Mycelium Protocol</a>
+    open-source ecosystem
+  </footer>
+</div>
+</body>
+</html>

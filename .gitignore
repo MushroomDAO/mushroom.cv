@@ -146,3 +146,13 @@ contracts/broadcast/
 
 # Wrangler
 .wrangler/
+_backup/
+
+# Research paper PDFs (large binary files, stored locally only)
+research/zuaec/papers/*.pdf
+
+# Claude conversation session archives (large, local-only)
+research/zuaec/claude-sessions/*.jsonl
+
+# 由部署 workflow 在 CI 里生成的构建戳
+site/build-stamp.txt

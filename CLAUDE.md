@@ -6,6 +6,7 @@
 
 外部贡献者可直接在 GitHub 上阅读：
 - [protocol/MISSION.md](https://github.com/AAStarCommunity/Brood/blob/main/protocol/MISSION.md)
+- [protocol/PGL/CONTEXT.md](https://github.com/AAStarCommunity/Brood/blob/main/protocol/PGL/CONTEXT.md) — 数字公共物品公约 / Public Goods Charter
 - [orgs/mycelium/PROFILE.md](https://github.com/AAStarCommunity/Brood/blob/main/orgs/mycelium/PROFILE.md)
 - [orgs/mycelium/INTERFACES.md](https://github.com/AAStarCommunity/Brood/blob/main/orgs/mycelium/INTERFACES.md)
 

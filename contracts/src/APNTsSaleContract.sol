@@ -2,6 +2,7 @@
 pragma solidity >=0.8.25;
 
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
@@ -63,6 +64,15 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
     event PaymentTokenSet(address indexed token, bool accepted);
     event PurchaseLimitsUpdated(uint256 minAmount, uint256 maxAmount);
     event EmergencyWithdraw(address indexed token, uint256 amount, address indexed to);
+    /// @notice Emitted by buyAPNTsFor when the recipient differs from the payer.
+    event APNTsPurchasedFor(
+        address indexed buyer,
+        address indexed recipient,
+        address indexed paymentToken,
+        uint256 aPNTsAmount,
+        uint256 usdAmount,
+        uint256 priceUsed
+    );
 
     // =============================================================
     //                        ERRORS
@@ -72,6 +82,7 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
     error ZeroAmount();
     error InvalidPrice();
     error PaymentTokenNotAccepted(address token);
+    error InvalidPaymentTokenDecimals(address token, uint8 decimals);
     error BelowMinPurchase(uint256 amount, uint256 minimum);
     error ExceedsMaxPurchase(uint256 amount, uint256 maximum);
     error InsufficientInventory(uint256 requested, uint256 available);
@@ -150,10 +161,39 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
      * with different decimals, owner should adjust the price accordingly.
      */
     function buyAPNTs(uint256 usdAmount, address paymentToken) external nonReentrant {
+        _buyAPNTsFor(msg.sender, usdAmount, paymentToken);
+    }
+
+    /**
+     * @notice Same as `buyAPNTs`, but credits the purchased aPNTs to `to`
+     *         instead of msg.sender. Payment is still pulled from msg.sender.
+     * @dev Added for SDK self-pay "buy into AirAccount" — recipient ≠ payer
+     *      (aastar-sdk#145 gap 2; e.g. pay with USDT from MetaMask EOA, credit
+     *      aPNTs to the user's AirAccount).
+     * @param to Recipient of the purchased aPNTs (must be non-zero).
+     * @return aPNTsAmount Amount of aPNTs credited to `to`.
+     */
+    function buyAPNTsFor(address to, uint256 usdAmount, address paymentToken)
+        external
+        nonReentrant
+        returns (uint256)
+    {
+        return _buyAPNTsFor(to, usdAmount, paymentToken);
+    }
+
+    /**
+     * @dev Core purchase logic. Payer is always msg.sender; recipient is `to`.
+     *      Only reachable via the nonReentrant `buyAPNTs` / `buyAPNTsFor` externals.
+     */
+    function _buyAPNTsFor(address to, uint256 usdAmount, address paymentToken)
+        internal
+        returns (uint256 aPNTsAmount)
+    {
+        if (to == address(0) || to == address(this)) revert ZeroAddress();
         if (usdAmount == 0) revert ZeroAmount();
         if (!acceptedPaymentTokens[paymentToken]) revert PaymentTokenNotAccepted(paymentToken);
 
-        uint256 aPNTsAmount = getAPNTsForUSD(usdAmount);
+        aPNTsAmount = getAPNTsForUSD(usdAmount);
 
         if (aPNTsAmount < minPurchaseAmount) revert BelowMinPurchase(aPNTsAmount, minPurchaseAmount);
         if (aPNTsAmount > maxPurchaseAmount) revert ExceedsMaxPurchase(aPNTsAmount, maxPurchaseAmount);
@@ -161,15 +201,20 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
         uint256 inventory = availableInventory();
         if (aPNTsAmount > inventory) revert InsufficientInventory(aPNTsAmount, inventory);
 
-        // Transfer payment from buyer to treasury
-        ERC20(paymentToken).safeTransferFrom(msg.sender, treasury, usdAmount);
-
-        // Transfer aPNTs to buyer
-        aPNTs.safeTransfer(msg.sender, aPNTsAmount);
-
+        // CEI: state update before external transfers.
         totalSold += aPNTsAmount;
 
+        // Transfer payment from payer (msg.sender) to treasury
+        ERC20(paymentToken).safeTransferFrom(msg.sender, treasury, usdAmount);
+
+        // Transfer aPNTs to recipient `to` (observable via the aPNTs Transfer event)
+        aPNTs.safeTransfer(to, aPNTsAmount);
+
         emit APNTsPurchased(msg.sender, paymentToken, aPNTsAmount, usdAmount, priceUSD);
+        // Record the actual recipient when it differs from the payer.
+        if (to != msg.sender) {
+            emit APNTsPurchasedFor(msg.sender, to, paymentToken, aPNTsAmount, usdAmount, priceUSD);
+        }
     }
 
     /**
@@ -188,10 +233,11 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
 
         uint256 usdAmount = getUSDForAPNTs(aPNTsAmount);
 
+        // CEI: state update before external transfers.
+        totalSold += aPNTsAmount;
+
         ERC20(paymentToken).safeTransferFrom(msg.sender, treasury, usdAmount);
         aPNTs.safeTransfer(msg.sender, aPNTsAmount);
-
-        totalSold += aPNTsAmount;
 
         emit APNTsPurchased(msg.sender, paymentToken, aPNTsAmount, usdAmount, priceUSD);
     }
@@ -226,6 +272,13 @@ contract APNTsSaleContract is Ownable, ReentrancyGuard {
      */
     function setPaymentToken(address token, bool accepted) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
+        // Codex MEDIUM-3 fix: enforce 6-decimal stablecoin (USDC/USDT). Mirrors
+        // SaleContractV2.setPaymentToken so pricing math (USD with 6 decimals)
+        // can't be subverted by whitelisting a non-6-dec token.
+        if (accepted) {
+            uint8 decimals = IERC20Metadata(token).decimals();
+            if (decimals != 6) revert InvalidPaymentTokenDecimals(token, decimals);
+        }
         acceptedPaymentTokens[token] = accepted;
         emit PaymentTokenSet(token, accepted);
     }

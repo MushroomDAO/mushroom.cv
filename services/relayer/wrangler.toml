@@ -4,14 +4,24 @@ compatibility_date = "2024-12-05"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
+# Network
 CHAIN_ID = "11155111"
-SALE_CONTRACT = "0xD2E2566566D459115D4159993E96c45c0d2cE6CD"
-USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 ENTRY_POINT = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
-# ── Set after SP PR merge + Sepolia deploy ─────────────────
-# REGISTRY_ADDRESS = "TODO"
-# MPNTS_ADDRESS = "TODO"
-# AIRACCOUNT_DELEGATE = "TODO"
+
+# Sale contracts (Sepolia, Path A canonical-bound stack, 2026-06-21)
+SALE_CONTRACT = "0x29eE47dEBD0E60d426352415749b4899057D913F"           # SaleContractV2 (→ canonical GToken)
+APNTS_SALE_CONTRACT = "0x136654d4141d151e9C237af65E98c03e22afc142"     # APNTsSaleContract (→ canonical aPNTs)
+USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+
+# v2/v3 gasless flow
+AIRACCOUNT_DELEGATE = "0x0BC1A36d932e2E9efA33b98043a73b8Be1a6E9Fc"
+BUY_HELPER = "0x0EA2AEd239574F4e875Ae570C67825da845E7e66"             # BuyHelper (gasless v3, → canonical + new sales)
+GTOKEN_ADDRESS = "0x20a051502a7AE6e40cfFd6EBe59057538E698984"          # canonical SuperPaymaster GToken
+APNTS_ADDRESS = "0x9e66B457E0ABb1F139FD8A596d00f784eBA2873b"           # canonical aPNTs
+
+# v1 legacy (INFRA_NOT_READY guard until SuperPaymaster stack is wired)
+# REGISTRY_ADDRESS = "0xa62EFc8a9138617E245bd21BcF5b5E406D864525"
+# MPNTS_ADDRESS = "0x83ca2b02f325B2C2e846BFe7582993acD10E5cc8"
 # MUSHROOM_COMMUNITY = "TODO"
 
 # Limits
@@ -21,9 +31,9 @@ RATE_LIMIT_GLOBAL_PER_HOUR = "100"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "TODO_replace_after_wrangler_kv_create"
-preview_id = "TODO_replace_after_wrangler_kv_create"
+id = "30e2dfb80d1943e28027d598440552d9"
+preview_id = "5aa9337c41f7470cbd823562e55679e6"
 
-# Secrets (set via: wrangler secret put OPERATOR_PK)
-# OPERATOR_PK        -- hot wallet private key
-# RPC_URL            -- Alchemy/Infura Sepolia endpoint
+# Secrets — set via:
+#   wrangler secret put OPERATOR_PK     # relayer hot wallet PK (0x4Bec0b1c... funded with Sepolia ETH)
+#   wrangler secret put RPC_URL         # SEPOLIA_RPC_URL2 from .env.sepolia

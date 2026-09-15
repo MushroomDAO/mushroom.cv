@@ -1,0 +1,94 @@
+# Cloudflare Pages 项目 launch-mushroom-box 没有接 GitHub（Git Provider = No），
+# 所以合并到 main 不会自动部署。这个 workflow 补上这一环：main 上 site/ 一变就发布。
+#
+# 需要的仓库 Secret（Settings → Secrets and variables → Actions）：
+#   CLOUDFLARE_API_TOKEN  —— 权限模板选 "Edit Cloudflare Workers"，
+#                            或自定义：Account / Cloudflare Pages / Edit
+# Account ID 不是凭据（在 dashboard URL 里就能看到），直接写在下面。
+
+name: Deploy site to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Action 一律 pin 到完整 commit SHA：这个 job 拿得到生产部署 token，
+      # 而 v4 / v3 这类 major tag 是可变的，上游 tag 被改指就等于把
+      # CLOUDFLARE_API_TOKEN 交给了新代码。升级时连同注释里的版本号一起改。
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Sanity-check the build output
+        run: |
+          set -euo pipefail
+          test -f site/index.html
+          test -f site/public-goods.html
+          test -f site/assets/goods-data.js
+          # 首页必须真的是花园页，别把空壳推上线
+          grep -q 'garden-stage' site/index.html
+          grep -q 'MYCELIUM_GOODS' site/assets/goods-data.js
+          echo "site/ 校验通过（$(find site -type f | wc -l) 个文件）"
+
+      # 每次构建盖一个唯一戳（commit SHA）。verify 步骤靠它判断线上到底是不是
+      # 这一次的构建——用页面里的固定标记（如 garden-stage）做哨兵是错的：
+      # 它在上一版部署里同样存在，既会假阳性（线上还是旧版却报成功），
+      # 也会假阴性（边缘返回更早的缓存版本）。
+      - name: Stamp the build
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > site/build-stamp.txt
+          echo "build stamp = $GITHUB_SHA"
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 7bf23342f21baa5ebfc7bc7b74f5a1f2
+          # action v4 默认装 wrangler "latest"，等于每次部署都用一个没验证过的
+          # 工具版本。pin 到本地实测跑通这条 pages deploy 命令的版本。
+          wranglerVersion: '4.110.0'
+          command: pages deploy site --project-name=launch-mushroom-box --branch=main
+
+      # 这一步不会让 job 变红：上传已成功，边缘传播延迟不是部署失败。
+      # 但"绿"不等于"线上已验证"，所以结论明确写进 job summary。
+      - name: Verify production is serving this exact build
+        run: |
+          set -euo pipefail
+          # 比对 build-stamp 里的 commit SHA，而不是页面里的固定标记。
+          # 本站开了 SPA 回退：未知路径也返回 200 + 首页 HTML，
+          # 所以戳文件还没上线时 grep -qx 自然不匹配，继续轮询即可；
+          # 状态码在这里毫无参考价值。
+          for i in $(seq 1 15); do
+            body=$(curl -sL --max-time 15 "https://launch.mushroom.cv/build-stamp.txt?cb=$RANDOM" || true)
+            if printf '%s' "$body" | grep -qx "$GITHUB_SHA"; then
+              echo "✅ launch.mushroom.cv 正在提供 $GITHUB_SHA（第 $i 次探测）"
+              echo "✅ **线上已验证**：launch.mushroom.cv 正在提供本次构建 \`$GITHUB_SHA\`（第 $i 次探测命中）。" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "[$i/15] 线上戳尚未更新，20s 后重试…"
+            sleep 20
+          done
+          echo "::warning::5 分钟内未在 launch.mushroom.cv 观察到 build-stamp=$GITHUB_SHA；部署可能仍在边缘传播中"
+          {
+            echo "⚠️ **线上未验证**：上传成功，但 5 分钟内未在 launch.mushroom.cv 观察到 \`$GITHUB_SHA\`。"
+            echo "本 job 仍为绿色（边缘传播延迟不算部署失败），请手动确认："
+            echo '```'
+            echo "curl -s https://launch.mushroom.cv/build-stamp.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

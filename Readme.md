@@ -50,6 +50,11 @@ npx wrangler pages deploy site --project-name launch-mushroom-box
 cd contracts && forge install && forge test
 ```
 
+### Operations / 运维
+- **开放 / 关闭销售**（手动 pause/unpause 控制分发节奏）：[docs/SALE-OPEN-CLOSE.md](./docs/SALE-OPEN-CLOSE.md) · 脚本 `scripts/sale-toggle.sh {status|open|close}`
+- **重部署后周知上下游**（SDK / DVT relay）：[docs/DOWNSTREAM-DEPS.md](./docs/DOWNSTREAM-DEPS.md) · 脚本 `scripts/release-notify.sh`
+- **已部署合约地址**：[contracts/DEPLOYED.md](./contracts/DEPLOYED.md)
+
 # 中文版-chinese-translation
 三个问题：
 1. 你是谁？
