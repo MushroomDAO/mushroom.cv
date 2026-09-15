@@ -43,9 +43,13 @@ jobs:
           # 首页必须真的是花园页，别把空壳推上线
           grep -q 'garden-stage' site/index.html
           grep -q 'MYCELIUM_GOODS' site/assets/goods-data.js
-          # 每个页面的 <head> 都要带 AdSense，ads.txt 也得在根目录
-          missing=$(grep -L 'adsbygoogle.js?client=ca-pub-3323568150935057' site/*.html || true)
+          # 除钱包/购买页外，每个页面的 <head> 都要带 AdSense，ads.txt 也得在根目录。
+          # join / join-gasless 有 MetaMask 签名和购买流程，刻意不放广告（防诈骗广告贴着购买按钮），
+          # 这里反过来也要校验它们确实没有。
+          NO_ADS='site/join.html site/join-gasless.html'
+          missing=$(grep -L 'adsbygoogle.js?client=ca-pub-3323568150935057' site/*.html | grep -vxF -f <(tr ' ' '\n' <<<"$NO_ADS") || true)
           if [ -n "$missing" ]; then echo "缺 AdSense 代码：$missing"; exit 1; fi
+          if grep -l 'adsbygoogle' $NO_ADS; then echo "上面这些钱包/购买页不应带广告"; exit 1; fi
           grep -q 'pub-3323568150935057' site/ads.txt
           echo "site/ 校验通过（$(find site -type f | wc -l) 个文件）"
 
